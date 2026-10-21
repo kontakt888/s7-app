@@ -19,8 +19,8 @@
 -->
 <style>
 html,body{margin:0;height:100%;position:fixed;inset:0;width:100%;overflow:hidden;overscroll-behavior:none;background:#0f1c27;color:#e8eef3;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;-webkit-font-smoothing:antialiased}
-#dash{position:absolute;left:0;right:0;bottom:0;top:env(safe-area-inset-top);width:100%;height:calc(100% - env(safe-area-inset-top));border:0;background:#0f1c27}
-#sb{position:fixed;bottom:0;height:env(safe-area-inset-bottom);width:1px;visibility:hidden;pointer-events:none}
+#dash{position:absolute;left:0;right:0;top:env(safe-area-inset-top);bottom:env(safe-area-inset-bottom);width:100%;height:calc(100% - env(safe-area-inset-top) - env(safe-area-inset-bottom));border:0;background:transparent}
+#ob,#ub{position:fixed;left:0;right:0;background:#0f1c27}#ob{top:0;height:env(safe-area-inset-top)}#ub{bottom:0;height:env(safe-area-inset-bottom)}
 .leer{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px;box-sizing:border-box}
 .leer img{width:72px;height:72px;border-radius:18px;margin-bottom:22px}
 .leer p{max-width:320px;color:#aab6c2;margin:6px 0}
@@ -35,7 +35,7 @@ html,body{margin:0;height:100%;position:fixed;inset:0;width:100%;overflow:hidden
 </head>
 <body>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true"><div><b>Mitteilungen erlauben</b><p>Damit dein Dashboard dir neue Anfragen, Buchungen und Überfälliges direkt auf dieses Gerät schicken kann. Danach fragt das Gerät einmal nach.</p><button id="ja">Erlauben</button><button id="nein">Abbrechen</button></div></div>
-<div id="sb"></div>
+<div id="ob"></div><div id="ub"></div>
 <script>
 (function(){
   var EXEC = 'https://script.google.com/macros/s/AKfycbzmQLsCrC7tcVvl4GS2TOqy93NRkj_XcqPWnuu5-VOwvo5hyrpQGKZ_wi3P6FQMXUOO/exec';
@@ -86,7 +86,8 @@ html,body{margin:0;height:100%;position:fixed;inset:0;width:100%;overflow:hidden
   window.addEventListener('message', function(e){
     var d = e.data; if (!d || typeof d !== 'object' || !d.s7app || !/^https:\/\/[a-z0-9-]+-script\.googleusercontent\.com$/.test(e.origin)) return;
     quelle = e.source; herkunft = e.origin;
-    if (d.s7app === 'hallo') status().then(function(s){ antwort({ s7app: 'da', push: s, sb: $('sb').offsetHeight || 0 }); });
+    if (d.s7app === 'hallo') status().then(function(s){ antwort({ s7app: 'da', push: s }); });
+    if (d.s7app === 'farben') { var ok = /^(rgb|rgba)\([\d.,\s]+\)$|^#[0-9a-f]{3,8}$/i; if (ok.test(d.oben || '')) { $('ob').style.background = d.oben; document.querySelector('meta[name=theme-color]').content = d.oben; } if (ok.test(d.unten || '')) { $('ub').style.background = d.unten; document.body.style.background = d.unten; } }
     if (d.s7app === 'aktivieren') { if (!kannPush) return antwort({ s7app: 'ergebnis', ok: false, fehler: 'Dieses Gerät kann keine Mitteilungen' }); vapid = String(d.vapid || ''); $('sheet').classList.add('on'); }
   });
 })();
