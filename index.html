@@ -37,9 +37,10 @@ html,body{margin:0;height:100%;background:#0f1c27;color:#e8eef3;font:15px/1.5 -a
 <script>
 (function(){
   var EXEC = 'https://script.google.com/macros/s/AKfycbzmQLsCrC7tcVvl4GS2TOqy93NRkj_XcqPWnuu5-VOwvo5hyrpQGKZ_wi3P6FQMXUOO/exec';
-  var k = '', m = /[#&]k=([A-Za-z0-9]{16,80})/.exec(location.hash || '');
-  try { if (m) { localStorage.setItem('s7k', m[1]); } k = localStorage.getItem('s7k') || ''; } catch (e) { k = m ? m[1] : ''; }
-  if (m) history.replaceState(null, '', location.pathname);
+  // Schlüssel steht in der Adresse (?k=…), damit „Zum Home-Bildschirm“ ihn mitnimmt (die Home-Bildschirm-App hat auf dem iPhone einen eigenen Speicher)
+  var k = '', m = /[?#&]k=([A-Za-z0-9]{16,80})/.exec(location.search + location.hash);
+  try { if (m) localStorage.setItem('s7k', m[1]); k = m ? m[1] : (localStorage.getItem('s7k') || ''); } catch (e) { k = m ? m[1] : ''; }
+  if (k && !/[?&]k=/.test(location.search)) history.replaceState(null, '', location.pathname + '?k=' + k);
   if (!k) {
     document.body.insertAdjacentHTML('afterbegin', '<div class="leer"><img src="icon-192.png" alt=""><p><b style="color:#fff">Studio Seven</b></p><p>Öffne den App-Link aus deiner Mail einmal auf diesem Gerät.</p></div>');
     return;
