@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Studio Seven">
+<meta name="theme-color" content="#0f1c27">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<title>Studio Seven</title>
+<!--
+  Dashboard-App (Hülle) für den Home-Bildschirm: zeigt das Dashboard (Apps Script) im Vollbild und meldet das Gerät für Mitteilungen an.
+  Hier liegen keine Daten. Ohne Dashboard-Schlüssel (kommt einmal per Mail als #k=…, bleibt nur auf diesem Gerät) wird nichts geladen.
+-->
+<style>
+html,body{margin:0;height:100%;background:#0f1c27;color:#e8eef3;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;-webkit-font-smoothing:antialiased}
+#dash{position:fixed;inset:0;width:100%;height:100%;border:0;background:#f4f6f8}
+.leer{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px;box-sizing:border-box}
+.leer img{width:72px;height:72px;border-radius:18px;margin-bottom:22px}
+.leer p{max-width:320px;color:#aab6c2;margin:6px 0}
+.sheet{position:fixed;inset:0;background:rgba(10,16,22,.55);display:none;align-items:flex-end;justify-content:center;z-index:5;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+.sheet.on{display:flex}
+.sheet div{background:#fff;color:#14202a;width:100%;max-width:440px;border-radius:20px 20px 0 0;padding:26px 22px calc(22px + env(safe-area-inset-bottom));box-sizing:border-box}
+.sheet b{display:block;font-size:19px;font-weight:600;margin-bottom:6px}
+.sheet p{color:#66737f;margin:0 0 20px}
+.sheet button{display:block;width:100%;border:0;border-radius:12px;padding:15px;font:600 16px -apple-system,BlinkMacSystemFont,sans-serif;margin-top:10px}
+#ja{background:#1683a8;color:#fff}#nein{background:#eef1f4;color:#14202a}
+</style>
+</head>
+<body>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true"><div><b>Mitteilungen erlauben</b><p>Damit dein Dashboard dir neue Anfragen, Buchungen und Überfälliges direkt aufs iPhone schicken kann. Danach fragt das iPhone einmal nach.</p><button id="ja">Erlauben</button><button id="nein">Abbrechen</button></div></div>
+<script>
+(function(){
+  var EXEC = 'https://script.google.com/macros/s/AKfycbzmQLsCrC7tcVvl4GS2TOqy93NRkj_XcqPWnuu5-VOwvo5hyrpQGKZ_wi3P6FQMXUOO/exec';
+  var k = '', m = /[#&]k=([A-Za-z0-9]{16,80})/.exec(location.hash || '');
+  try { if (m) { localStorage.setItem('s7k', m[1]); } k = localStorage.getItem('s7k') || ''; } catch (e) { k = m ? m[1] : ''; }
+  if (m) history.replaceState(null, '', location.pathname);
+  if (!k) {
+    document.body.insertAdjacentHTML('afterbegin', '<div class="leer"><img src="icon-192.png" alt=""><p><b style="color:#fff">Studio Seven</b></p><p>Öffne den App-Link aus deiner Mail einmal auf diesem Gerät.</p></div>');
+    return;
+  }
+  var f = document.createElement('iframe');
+  f.id = 'dash'; f.title = 'Studio Seven Dashboard'; f.allow = 'clipboard-write; microphone';
+  f.src = EXEC + '?view=dashboard&k=' + encodeURIComponent(k);
+  document.body.appendChild(f);
+
+  var kannPush = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  var reg = kannPush ? navigator.serviceWorker.register('sw.js') : null;
+  function speicher(n, v){ return caches.open('s7').then(function(c){ return c.put('/' + n, new Response(v)); }); }
+  function lies(n){ return caches.open('s7').then(function(c){ return c.match('/' + n); }).then(function(r){ return r ? r.text() : ''; }); }
+  function status(){
+    if (!kannPush) return Promise.resolve('nicht-unterstuetzt');
+    if (Notification.permission === 'denied') return Promise.resolve('verweigert');
+    return reg.then(function(r){ return r.pushManager.getSubscription(); }).then(function(s){ return lies('token').then(function(t){ return s && t && Notification.permission === 'granted' ? 'aktiv' : 'aus'; }); }).catch(function(){ return 'aus'; });
+  }
+  function b64(s){ s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; var r = atob(s), a = new Uint8Array(r.length); for (var i = 0; i < r.length; i++) a[i] = r.charCodeAt(i); return a; }
+  function geraet(){ var u = navigator.userAgent; return (/iPhone/.test(u) ? 'iPhone' : /iPad/.test(u) ? 'iPad' : /Android/.test(u) ? 'Android' : /Mac/.test(u) ? 'Mac' : 'Gerät') + ' · Dashboard-App'; }
+  var quelle = null, herkunft = '', vapid = '';
+  function antwort(o){ if (quelle) quelle.postMessage(o, herkunft); }
+  function anmelden(){
+    $('sheet').classList.remove('on');
+    Notification.requestPermission().then(function(p){
+      if (p !== 'granted') throw new Error(p === 'denied' ? 'Mitteilungen sind gesperrt. iPhone-Einstellungen → Mitteilungen → Studio Seven → Erlauben.' : 'Nicht erlaubt');
+      return reg;
+    }).then(function(r){
+      return r.pushManager.getSubscription().then(function(alt){ return alt ? alt.unsubscribe() : null; }).then(function(){ return r.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(vapid) }); });
+    }).then(function(sub){
+      return fetch(EXEC, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'pushabo', k: k, sub: sub.toJSON(), geraet: geraet() }) }).then(function(r){ return r.json(); });
+    }).then(function(j){
+      if (!j || !j.ok) throw new Error(j && j.error === 'zugriff' ? 'Dashboard-Schlüssel ist nicht mehr gültig. App-Link neu anfordern.' : 'Anmeldung hat nicht geklappt');
+      return Promise.all([speicher('token', j.token), speicher('seit', new Date().toISOString())]);
+    }).then(function(){ antwort({ s7app: 'ergebnis', ok: true }); })
+      .catch(function(e){ antwort({ s7app: 'ergebnis', ok: false, fehler: String(e && e.message || e) }); });
+  }
+  function $(id){ return document.getElementById(id); }
+  $('ja').onclick = anmelden;
+  $('nein').onclick = function(){ $('sheet').classList.remove('on'); antwort({ s7app: 'ergebnis', ok: false, fehler: 'Abgebrochen' }); };
+  window.addEventListener('message', function(e){
+    var d = e.data; if (!d || typeof d !== 'object' || !d.s7app || !/^https:\/\/[a-z0-9-]+-script\.googleusercontent\.com$/.test(e.origin)) return;
+    quelle = e.source; herkunft = e.origin;
+    if (d.s7app === 'hallo') status().then(function(s){ antwort({ s7app: 'da', push: s }); });
+    if (d.s7app === 'aktivieren') { if (!kannPush) return antwort({ s7app: 'ergebnis', ok: false, fehler: 'Dieses Gerät kann keine Mitteilungen' }); vapid = String(d.vapid || ''); $('sheet').classList.add('on'); }
+  });
+})();
+</script>
+</body>
+</html>
